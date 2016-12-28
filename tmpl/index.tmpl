@@ -1,0 +1,293 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN"
+	  "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"> 
+<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en"> 
+  <head> 
+    <meta http-equiv="content-type" content="text/html; charset=utf-8" /> 
+    <meta name="keywords" content="Weather,Pozdechov, Meteo, Pocasi, Meteostanice, VantagePro 2" /> 
+<link rel="shortcut icon" href="/favicon.ico" /> 
+<title>Meteostanice Pozdechov</title> 
+<link rel="stylesheet" href="main.css" type="text/css" /> 
+<link type="text/css" href="css/smoothness/jquery-ui-1.8.21.custom.css" rel="stylesheet" />
+<script type="text/javascript" src="http://ajax.googleapis.com/ajax/libs/jquery/1.8.2/jquery.min.js"></script>
+<script type="text/javascript" src="jquery-ui-1.8.21.custom.min.js"></script>
+<script type="text/javascript" src="jquery.timers-1.2.js"></script> 
+<script>
+  var fromDate = new Date();
+  var toDate = new Date();
+  fromDate.setTime(toDate.getTime() - 1000*60*60*24*31);
+
+  $(function() {
+  $( "#from" ).datepicker({
+  defaultDate: "-1w",
+  changeMonth: true,
+  numberOfMonths: 1,
+  dateFormat: "dd.mm.yy",
+  nextText: "" ,
+  prevText: "" ,
+  onSelect: function( selectedDate ) {
+  $( "#to" ).datepicker( "option", "minDate", selectedDate );
+    fromDate = $( "#from" ).datepicker( "getDate" );
+    drawChart();
+  }
+  });
+  $( "#to" ).datepicker({
+  defaultDate: "+0",
+  changeMonth: true,
+  numberOfMonths: 1,
+  dateFormat: "dd.mm.yy",
+  nextText: "" ,
+  prevText: "" ,
+  onSelect: function( selectedDate ) {
+  $( "#from" ).datepicker( "option", "maxDate", selectedDate );
+    toDate = $( "#to" ).datepicker( "getDate" );
+    drawChart();
+  }
+  });
+  });
+  $( "#from" ).datepicker("setDate", fromDate);
+  $( "#to" ).datepicker("setDate", toDate);
+
+
+  </script>
+</head> 
+<body>
+  <div id="wrapper">
+  <div id="header">
+
+     <h1 style="margin-bottom: 5px">Meteostanice Pozděchov</h1>
+
+     <h4 style="margin: 0px; margin-bottom: 8px" >49°14'N, 17°58'E, n.v. 510 m</h4>
+  </div>
+  <table id="main">
+  <tr><td><div id=_datum class=leftside>Čas</div></td><td><div id=datum class=rightside></div></td></tr>
+  <tr><td><div id=_teplota class=leftside>Teplota</div></td><td><div id=teplota class=rightside></div></td></tr>
+  <tr><td><div id=_tlak class=leftside>Tlak</div></td><td><div id=tlak class=rightside></div></td></tr>
+  <tr><td><div id=_vlhkost class=leftside>Vlhkost</div></td><td><div id=vlhkost class=rightside></div></td></tr>
+  <tr><td><div id=_daily_rain class=leftside>Srážky dnes</div></td><td><div id=daily_rain class=rightside></div></td></tr>
+  <tr><td><div id=_month_to_date_rain class=leftside>v měsíci</div></td><td><div id=month_to_date_rain class=rightside></div></td></tr>
+  <tr><td><div id=_year_to_date_rain class=leftside>v roce</div></td><td><div id=year_to_date_rain class=rightside></div></td></tr>
+  <tr><td><div id=_storm_total_rainfall class=leftside>z bouřky</div></td><td><div id=storm_total_rainfall class=rightside></div></td></tr>
+  </table>  
+  <img id="current_camview" style="width=640px" src="img/current_camview.jpg" />
+
+<div id="container" style="height: 600px; min-width: 310px"></div>
+<div id="chart_2" style="height: 400px; min-width: 310px"></div>
+<div style="float: none">
+
+<!--img  style="float: left; margin-top: 50px; width: auto; margin-left: 320px;margin-right: auto" src="DSC_6997.jpg" /-->   
+<img  style="float: left;margin-top: 50px; width: auto; margin-left: 320px; " src="DSC_6997.jpg" />   
+
+<img  style="float: left; margin-top: 50px; width: auto; margin-left: 5px; " src="meteo-pozdechov-90.png" />   
+<!--img  style="float: left; margin-top: 5px; margin-left: 317px;margin-right: auto; padding: 0px" src="meteo-pozdechov-90.png" /-->   
+</div>
+</div>
+  </div>
+<script src="http://code.highcharts.com/stock/highstock.js"></script>
+<script src="http://code.highcharts.com/stock/modules/exporting.js"></script>
+<script src="js/grid-light.js"></script>
+
+
+    <script type='text/javascript'>
+ 
+$(function () {
+	Highcharts.setOptions({
+		lang: {
+			months: ['Leden', 'Únor', 'Březen', 'Duben', 'Květen', 'Červen',  'Červenec', 'Srpen', 'Září', 'Říjen', 'Listopad', 'Prosinec'],
+			shortMonths: ['Led', 'Úno', 'Bře', 'Dub', 'Kvě', 'Črv',  'Črn', 'Srp', 'Zář', 'Říj', 'Lis', 'Pro'],
+			weekdays: ['Neděle','Pondělí', 'Úterý', 'Středa', 'Čtvrtek', 'Pátek', 'Sobota'],
+	rangeSelectorFrom: "Od",
+	rangeSelectorTo: "Do",
+	rangeSelectorZoom: "Období",
+
+		}
+	});
+
+	$.getJSON('vp2_json?type=archive&from=' + $.datepicker.formatDate("yymmdd", fromDate) + "&to=" + $.datepicker.formatDate("yymmdd", toDate) , 
+	  function (data) {
+        $('#container').highcharts('StockChart', {
+        rangeSelector: {
+			buttons: [
+				   { type: 'day', count: 1, text: '1d'
+				}, { type: 'day', count: 3, text: '3d'
+				}, { type: 'week', count: 1, text: '1t'
+				}, { type: 'month', count: 1, text: '1m'
+				}, { type: 'month', count: 3, text: '3m'
+				}, { type: 'year', count: 1, text: '1r'
+				}, { type: 'all', text: 'Vše' }
+				],
+			selected: 1
+	    },
+	    title: { text: 'Historie měření' },
+	    yAxis: [
+			{
+			labels: { align: 'right', x: -3 },
+			title: { text: 'Teplota °C' },
+			plotLines: [ { value: 0, color: 'black', dashStyle: 'shortdash', width: 2 }],
+			celing: 42,
+			floor: -42,
+			height: '40%',
+			lineWidth: 2
+	        }, {
+			labels: { align: 'right', x: -3 },
+			title: { text: 'Tlak hPa' },
+			celing: 1200,
+			floor: 800,
+			top: '42%',
+			height: '18%',
+			offset: 0,
+			lineWidth: 2
+	        }, {
+			labels: { align: 'right', x: -3 },
+			title: { text: 'Srážky mm' },
+			celing: 100,
+			floor: 0,
+			top: '62%',
+			height: '18%',
+			offset: 0,
+			lineWidth: 2
+			}, {
+			labels: { align: 'right', x: -3 },
+			title: { text: 'Vítr m/s' },
+			celing: 50,
+			floor: 0,
+			top: '82%',
+			height: '18%',
+			offset: 0,
+			lineWidth: 2
+			}],
+
+	    series: [
+			{
+			name: 'Teplota max',
+			color: 'darkred',
+			tooltip: { valueSuffix: '°C', valueDecimals: 1 },
+			dataGrouping: { approximation: 'high', groupPixelWidth: 4 },
+			data: data.hi_outtemp
+			}, {
+			name: 'Teplota min',
+			color: 'lightblue',
+			tooltip: { valueSuffix: '°C' , valueDecimals: 1 },
+			dataGrouping: { approximation: 'low' },
+			data: data.lo_outtemp
+			}, {
+			name: 'Tlak',
+			color: 'SteelBlue',
+			tooltip: { valueSuffix: 'hPa' , valueDecimals: 0 },
+			data: data.bar,
+			yAxis: 1
+			}, {
+			name: 'Srážky',
+			type: 'column',
+  pointPadding: 0,
+      groupPadding: 0,
+			color: 'RoyalBlue',
+			tooltip: { valueSuffix: 'mm' , valueDecimals: 1 },
+			step: true,
+			fillColor:  'Blue',
+			data: data.rain,
+			yAxis: 2
+				}, {
+			name: 'Vítr',
+			color: 'LightSteelBlue',
+			tooltip: { valueSuffix: 'm/s' , valueDecimals: 1 },
+			data: data.hi_wspeed,
+			yAxis: 3
+				}]
+	});
+	});
+  fromDate.setTime(toDate.getTime() - 1000*60*60*24*730);
+	$.getJSON('vp2_json?type=archive_day&from=' + $.datepicker.formatDate("yymmdd", fromDate) + "&to=" + $.datepicker.formatDate("yymmdd", toDate) , 
+	  function (data) {
+        $('#chart_2').highcharts('StockChart', {
+        rangeSelector: {
+			buttons: [
+				   { type: 'month', count: 1, text: '1m'
+				}, { type: 'month', count: 3, text: '3m'
+				}, { type: 'year', count: 1, text: '1r'
+				}, { type: 'all', text: 'Vše' }
+				],
+			selected: 2
+	    },
+	    title: { text: 'Denní maxima, minima' },
+	    yAxis: [
+			{
+			labels: { align: 'right', x: -3 },
+			title: { text: 'Teplota °C' },
+			plotLines: [ { value: 0, color: 'black', dashStyle: 'shortdash', width: 2 }],
+			celing: 42,
+			floor: -42,
+			height: '65%',
+			lineWidth: 2
+	        }, {
+			labels: { align: 'right', x: -3 },
+			title: { text: 'Srážky mm' },
+			celing: 100,
+			floor: 0,
+			top: '62%',
+			height: '30%',
+			offset: 0,
+			lineWidth: 2
+			}],
+
+	    series: [
+			{
+			name: 'Teplota max',
+			color: 'darkred',
+			tooltip: { valueSuffix: '°C', valueDecimals: 1 },
+			dataGrouping: { approximation: 'high', groupPixelWidth: 4 },
+			data: data.max_outtemp
+			}, {
+			name: 'Teplota min',
+			color: 'lightblue',
+			tooltip: { valueSuffix: '°C' , valueDecimals: 1 },
+			dataGrouping: { approximation: 'low' },
+			data: data.min_outtemp
+			}, {
+			name: 'Srážky',
+			color: 'RoyalBlue',
+			tooltip: { valueSuffix: 'mm' , valueDecimals: 1 },
+			step: true,
+			fillColor:  'Blue',
+			data: data.rain,
+			type: 'column',
+  pointPadding: 0,
+      groupPadding: 0,
+			yAxis: 1
+			}]
+	});
+    });
+});
+	
+     function to_c(f){return (f-32)*(5/9)};
+     function to_mm(i){return i*25.4};
+     function to_hpa(hg){return (3386.39*hg/100)};
+     function to_kmh(mh){return (mh*1.609344)};
+
+//     function aprox(a b c) {if (a !== 0) then return a; else if (b == 0 ) return (b+c)/2;} 
+     function currentobs(){
+        newdate = new Date();
+        $.getJSON("vp2_json?type=current"  ,
+//        $.getJSON("vp2_json?current&" + newdate.getTime().toString()   ,
+        function(data){
+          d = data.dataset[0].CURR_DATE;
+          date = new Date(d.substr(0,4), d.substr(4,2) -1 ,d.substr(6,2), d.substr(8,2),d.substr(10,2));
+  
+          $('div#datum').text(date.toLocaleTimeString("cs-CZ"));
+          $('div#tlak').text((Number(data.dataset[0].BAR)).toFixed(1) + " hPa");
+          $('div#teplota').text(Number(data.dataset[0].OUTTEMP).toFixed(1) + "°C");
+          $('div#vlhkost').text(data.dataset[0].OUTHUM + " %");
+          $('div#daily_rain').text(Number(data.dataset[0].DAYRAIN).toFixed(0) + " mm");
+          $('div#month_to_date_rain').text(Number(data.dataset[0].MONRAIN).toFixed(0) + " mm");
+          $('div#year_to_date_rain').text(Number(data.dataset[0].YEARRAIN).toFixed(0) + " mm");
+          $('div#storm_total_rainfall').text(Number(data.dataset[0].STORMRAIN).toFixed(0) + " mm");
+        }); 
+     }
+     $(document).ready(function(){
+
+        currentobs(); 
+        window.setInterval(function(){currentobs();},60000);   
+//        event.preventDefault();
+     });
+   </script>
+ </body>
+ </html>
