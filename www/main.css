@@ -1,0 +1,42 @@
+body {
+ background-color: #FFFFFF;
+ margin: 0;
+ padding: 0;
+}
+#wrapper {
+  width: 920px;
+  margin-right: auto;
+  margin-left: auto;
+  border: 1px dashed;
+
+}
+*.leftside {
+  text-align: right;
+  border-right: 1px;
+ margin-right: 1px;
+}
+*.rightside {
+  text-align: left;
+  border-left: 1px dashed;
+  margin-left: 6px;
+  padding-left: 6px;
+}
+#header {
+  color: #BBBBBB;
+  text-align: center;
+  margin-right: auto;
+  margin-left: auto;
+}
+#main {
+  border-collapse: collapse;
+  border-spacing: 5px 0;
+  margin-right: auto;
+  margin-left: auto;
+
+}
+#current_camview {
+  margin-right: 60px;
+  margin-left: 60px;
+  margin-top: 50px;
+  margin-bottom: 50px;
+}

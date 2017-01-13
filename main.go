@@ -4,6 +4,7 @@ import (
 	"encoding/csv"
 	"fmt"
 	"io"
+	"io/ioutil"
 	"log"
 	"net/http"
 	"strings"
@@ -16,7 +17,8 @@ import (
 )
 
 const (
-	format = "200601021504"
+	format    = "200601021504"
+	formatDay = "20060102"
 )
 
 //Archive - message with archive data
@@ -34,9 +36,9 @@ type Archive struct {
 
 //Current record
 type Current struct {
-	CurrDate                                                                                  int
+	CurrDate                                                                                  string
 	WindDir                                                                                   string
-	WindSpeed, InTemp, BarTrend, InHum, AvgSpeed, Forecasticon, OutTemp, DayRain              float64
+	WindSpeed, InTemp, BarTrend, InHum, AvgSpeed, ForecastIcon, OutTemp, DayRain              float64
 	StormRain, OutHum, StormStart, RainRate, Bar, MonRain, YearRain, ForecastRule, WindDirDeg float64
 }
 type vanprod struct {
@@ -45,76 +47,67 @@ type vanprod struct {
 	archiveDay  Archive
 	archiveLast time.Time
 	current     Current
+	camdata     []byte
 }
 
-//avg_wspeed,bar,bar_trend,curr_date,dayrain,forecasticon,forecastrule,inhum,intemp,monrain,outhum,outtemp,rain_rate,stormrain,stormstart,winddir,winddir_deg,windspeed,yearrain
-//9.7,1027.2,236,20170109153242,0,6,5,55,7.2,0.2,78,-6.9,0,0,0,N,15,4.8,0.2
+//{"OutHum":93,"ForecastIcon":6,"YearRain":0.2,"InTemp":"1.0","WindDir":"S","StormStart":0,"WindSpeed":"1.6","RainRate":0,
+//"MonRain":0.2,"WindDirDeg":"194","DayRain":0,"InHum":55,"StormRain":0,"BarTrend":20,"CurrDate":"20170112070139","Bar":"1010.9",
+//"OutTemp":"-6.8","AvgWspeed":"3.2","ForecastRule":45}
 
-func (vp *vanprod) getArchive(c *gin.Context, format string, interval time.Duration, table string) {
+func (vp *vanprod) getArchive(from, to string, format string, interval time.Duration, table string) Archive {
 	// first we decide if we want to rebuilt in memory result set in vp.archive
 	// - only for specific query(from,to) or if the value of vp.archiveLast does not match last ID in the database
 	// - otherwise we return result set direct from memory
 
-	if c.Query("from")+c.Query("to") != "" || !vp.archive.To.Equal(vp.archiveLast) {
-		from := c.DefaultQuery("from", time.Now().Add(-7*24*time.Hour).Format(format))
-		to := c.DefaultQuery("to", time.Now().Format(format))
-		fromTime, _ := time.Parse(format, from)
+	fromTime, _ := time.Parse(format, from)
 
-		toTime, _ := time.Parse(format, to)
-		interval := time.Minute * 30
-		iter := fromTime.Truncate(interval)
-		// the instance is shared and we create
-		archive := Archive{
-			From:     fromTime,
-			To:       toTime,
-			Start:    iter.Unix(),
-			Interval: int64(interval.Seconds() * 1000),
-		}
-		stmt, err := vp.db.Prepare("select ID, HI_OUTTEMP, LO_OUTTEMP, RAIN, BAR, HI_WSPEED from " + table + "  where id = ?")
-		if err != nil {
-			log.Fatal(err)
-		}
-		defer stmt.Close()
-		var id, cnt int
-		var hiOutTemp, loOutTemp, rain, bar, hiWspeed float64
-		// we will be iterating over time period in interval of 30 minutes
-		// and we expect the DB has record for each interval; if record is missing, the previous values are used up to 5 missing intervals
-		// time range is also limited by the last recorded interval and current time
-
-		// we added 1 second only for comparison, otherwise we should also test time.Equal
-		for ; toTime.Add(time.Second).After(iter) && vp.archiveLast.Add(time.Second).After(iter); iter = iter.Add(interval) {
-
-			err = stmt.QueryRow(iter.Format(format)).Scan(&id, &hiOutTemp, &loOutTemp, &rain, &bar, &hiWspeed)
-			log.Printf("ID=%d\n", id)
-			if err != nil {
-				log.Println(err)
-				if id > 0 {
-					cnt++
-				}
-			} else {
-				cnt = 0
-			}
-			if cnt > 5 {
-				log.Println("Gap in DB is too big")
-				break
-			}
-			// for missing intervals in DB, we fill the gap with last values
-			if id > 0 {
-				archive.HiOutTemp = append(archive.HiOutTemp, hiOutTemp)
-				archive.LoOutTemp = append(archive.LoOutTemp, loOutTemp)
-				archive.Rain = append(archive.Rain, rain)
-				archive.Bar = append(archive.Bar, bar)
-				archive.HiWSpeed = append(archive.HiWSpeed, hiWspeed)
-			}
-		}
-		// we update  in memory result set only in case of default query
-		if c.Query("from")+c.Query("to") == "" {
-			vp.archive = archive
-		}
-		c.JSON(http.StatusOK, archive)
-	} else {
-		c.JSON(http.StatusOK, vp.archive)
+	toTime, _ := time.Parse(format, to)
+	iter := fromTime.Truncate(interval)
+	// the instance is shared and we create
+	archive := Archive{
+		From:     fromTime,
+		To:       toTime,
+		Start:    iter.Unix() * 1000,
+		Interval: int64(interval.Seconds() * 1000),
 	}
+	stmt, err := vp.db.Prepare("select ID, HI_OUTTEMP, LO_OUTTEMP, RAIN, BAR, HI_WSPEED from " + table + "  where id = ? and hi_outtemp < 100 and rain < 400")
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer stmt.Close()
+	var id, cnt int
+	var hiOutTemp, loOutTemp, rain, bar, hiWspeed float64
+	// we will be iterating over time period in interval of 30 minutes
+	// and we expect the DB has record for each interval; if record is missing, the previous values are used up to 5 missing intervals
+	// time range is also limited by the last recorded interval and current time
+
+	// we added 1 second only for comparison, otherwise we should also test time.Equal
+	for ; toTime.Add(time.Second).After(iter) && vp.archiveLast.Add(time.Second).After(iter); iter = iter.Add(interval) {
+
+		err = stmt.QueryRow(iter.Format(format)).Scan(&id, &hiOutTemp, &loOutTemp, &rain, &bar, &hiWspeed)
+		// log.Printf("ID=%d\n", id)
+		if err != nil {
+			// log.Println(err)
+			if id > 0 {
+				cnt++
+			}
+		} else {
+			cnt = 0
+		}
+		if cnt > 30 {
+			log.Println("Gap in DB is too big")
+			break
+		}
+		// for missing intervals in DB, we fill the gap with last values
+		if id > 0 {
+			archive.HiOutTemp = append(archive.HiOutTemp, hiOutTemp)
+			archive.LoOutTemp = append(archive.LoOutTemp, loOutTemp)
+			archive.Rain = append(archive.Rain, rain)
+			archive.Bar = append(archive.Bar, bar)
+			archive.HiWSpeed = append(archive.HiWSpeed, hiWspeed)
+		}
+	}
+	return archive
 }
 
 func (vp *vanprod) getArchiveLast() time.Time {
@@ -153,7 +146,6 @@ func (vp *vanprod) postArchive(c *gin.Context) {
 		if err != nil {
 			log.Fatal(err)
 		}
-		vp.archiveLast = vp.getArchiveLast()
 
 		fmt.Println(record)
 	}
@@ -171,14 +163,30 @@ func (vp *vanprod) postArchive(c *gin.Context) {
 	if err != nil {
 		log.Fatal(err)
 	}
+	vp.reloadData()
+}
+
+func (vp *vanprod) reloadData() {
+	vp.archiveLast = vp.getArchiveLast()
+	vp.archive = vp.getArchive(
+		time.Now().Add(-7*24*time.Hour).Format(format),
+		time.Now().Format(format),
+		format,
+		time.Minute*30,
+		"data_archive")
+	vp.archiveDay = vp.getArchive(
+		"20120101",
+		time.Now().Format(formatDay),
+		formatDay,
+		time.Hour*24,
+		"data_archive_day")
+	// nekter udaje nebudeme predavata, proto vynulujeme
+	vp.archiveDay.Bar = nil
+	vp.archiveDay.HiWSpeed = nil
 	//tx.Commit()
 }
 func main() {
-	router := gin.Default()
-	router.LoadHTMLGlob("tmpl/*")
-	router.GET("/index", func(c *gin.Context) {
-		c.HTML(http.StatusOK, "index.html", nil)
-	})
+
 	var vp vanprod
 	db, err := sql.Open("sqlite3", "./vp2.db")
 	if err != nil {
@@ -207,15 +215,68 @@ AVG_WDIR	text
 		return
 	}
 	vp.db = db
+	vp.reloadData()
 	// Group using gin.BasicAuth() middleware
 	// gin.Accounts is a shortcut for map[string]string
+	gin.SetMode("release")
+	router := gin.Default()
 	admin := router.Group("/admin/", gin.BasicAuth(gin.Accounts{
 		"pozdechov": "vp2",
 	}))
+	router.StaticFS("/static", http.Dir("www"))
+	router.LoadHTMLGlob("tmpl/*")
+	router.GET("/", func(c *gin.Context) {
+		c.HTML(http.StatusOK, "vp2.html", nil)
+	})
+	router.GET("/archive", func(c *gin.Context) {
+		if c.Query("from")+c.Query("to") == "" {
+			c.JSON(http.StatusOK, vp.archive)
+		} else {
+			archive := vp.getArchive(
+				c.DefaultQuery("from", time.Now().Add(-7*24*time.Hour).Format(format)),
+				c.DefaultQuery("to", time.Now().Format(format)),
+				format,
+				time.Minute*30,
+				"data_archive")
 
-	router.GET("/archive", func(c *gin.Context) { vp.getArchive(c, "200601021504", time.Minute*30, "data_archive") })
-	router.GET("/archive/day", func(c *gin.Context) { vp.getArchive(c, "20060102", time.Hour*24, "data_archive_day") })
+			c.JSON(http.StatusOK, archive)
+		}
+	})
+	router.GET("/archive/day", func(c *gin.Context) {
+		c.JSON(http.StatusOK, vp.archiveDay)
+	})
 	router.GET("/archive/lastid", vp.getArchiveLastID)
+	router.GET("/current", func(c *gin.Context) {
+		c.JSON(http.StatusOK, vp.current)
+	})
+	router.GET("/camview.jpg", func(c *gin.Context) {
+		c.Data(http.StatusOK, c.ContentType(), vp.camdata)
+	})
+	router.GET("/vp2_json", func(c *gin.Context) {
+		d := vp.current
+		t := d.CurrDate
+		c.String(http.StatusOK, "|%s|%s|%.1f|%.0f|%.1f|%.1f|%.0f|%.1f|",
+			t[6:8]+"."+t[4:6]+"."+t[0:4], t[8:10]+":"+t[10:12],
+			d.OutTemp, d.OutHum, d.Bar, d.AvgSpeed/3.6, d.WindDirDeg, d.DayRain)
+	})
 	admin.POST("/submit/archive", vp.postArchive)
+	admin.POST("/submit/current", func(c *gin.Context) {
+		var json Current
+		err := c.BindJSON(&json)
+		if err == nil {
+			vp.current = json
+		} else {
+			log.Println(err)
+		}
+	})
+	admin.POST("/submit/camdata", func(c *gin.Context) {
+		camdata, err := ioutil.ReadAll(c.Request.Body)
+		c.Request.Body.Close()
+		if err != nil {
+			log.Println(err)
+		} else {
+			vp.camdata = camdata
+		}
+	})
 	router.Run(":8080")
 }
