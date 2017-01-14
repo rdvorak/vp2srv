@@ -72,7 +72,7 @@ func (vp *vanprod) getArchive(from, to string, format string, interval time.Dura
 	}
 	stmt, err := vp.db.Prepare("select ID, HI_OUTTEMP, LO_OUTTEMP, RAIN, BAR, HI_WSPEED from " + table + "  where id = ? and hi_outtemp < 100 and rain < 400")
 	if err != nil {
-		log.Fatal(err)
+		log.Println(err)
 	}
 	defer stmt.Close()
 	var id, cnt int
@@ -136,7 +136,7 @@ func (vp *vanprod) postArchive(c *gin.Context) {
 			break
 		}
 		if err != nil {
-			log.Fatal(err)
+			log.Println(err)
 		}
 		stmt := `insert or replace into data_archive(
 			ID, OUTTEMP	, HI_OUTTEMP	, LO_OUTTEMP	, RAIN	, RAIN_RATE	,
@@ -144,7 +144,7 @@ func (vp *vanprod) postArchive(c *gin.Context) {
 			) values(` + strings.Join(record, ",") + ")"
 		_, err = vp.db.Exec(stmt)
 		if err != nil {
-			log.Fatal(err)
+			log.Println(err)
 		}
 
 		fmt.Println(record)
@@ -161,7 +161,7 @@ func (vp *vanprod) postArchive(c *gin.Context) {
 		`
 	_, err := vp.db.Exec(stmt)
 	if err != nil {
-		log.Fatal(err)
+		log.Println(err)
 	}
 	vp.reloadData()
 }
@@ -218,12 +218,13 @@ AVG_WDIR	text
 	vp.reloadData()
 	// Group using gin.BasicAuth() middleware
 	// gin.Accounts is a shortcut for map[string]string
-	gin.SetMode("release")
+	gin.SetMode("debug")
 	router := gin.Default()
 	admin := router.Group("/admin/", gin.BasicAuth(gin.Accounts{
 		"pozdechov": "vp2",
 	}))
 	router.StaticFS("/static", http.Dir("www"))
+	router.StaticFS("/Bacovi-rodokmen", http.Dir("www/Bacovi-rodokmen"))
 	router.LoadHTMLFiles("www/vp2.html")
 	router.GET("/", func(c *gin.Context) {
 		c.HTML(http.StatusOK, "vp2.html", nil)
@@ -278,5 +279,5 @@ AVG_WDIR	text
 			vp.camdata = camdata
 		}
 	})
-	router.Run(":8080")
+	router.Run(":80")
 }
