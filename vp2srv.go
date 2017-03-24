@@ -94,7 +94,7 @@ func (vp *vanprod) getArchive(from, to string, format string, interval time.Dura
 		} else {
 			cnt = 0
 		}
-		if cnt > 30 {
+		if cnt > 500 {
 			log.Println("Gap in DB is too big")
 			break
 		}
@@ -154,7 +154,7 @@ func (vp *vanprod) postArchive(c *gin.Context) {
 		ID, HI_OUTTEMP	, LO_OUTTEMP	, RAIN	, RAIN_RATE	,
 		BAR	, OUTHUM	, AVG_WSPEED	, HI_WSPEED
 		) select substr(id,1,8), max(hi_outtemp), min(lo_outtemp),
-		max(rain_rate), sum(rain), round(avg(bar),2), round(avg(outhum),2), round(avg(avg_wspeed),2), max(hi_wspeed)
+		sum(rain), max(rain_rate), round(avg(bar),2), round(avg(outhum),2), round(avg(avg_wspeed),2), max(hi_wspeed)
 		from data_archive
 		group by substr(id,1,8)
 		;
