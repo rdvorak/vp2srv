@@ -220,16 +220,16 @@ AVG_WDIR	text
 	// gin.Accounts is a shortcut for map[string]string
 	gin.SetMode("debug")
 	router := gin.Default()
-	admin := router.Group("/admin/", gin.BasicAuth(gin.Accounts{
+	admin := router.Group("/vp2/admin/", gin.BasicAuth(gin.Accounts{
 		"pozdechov": "vp2",
 	}))
-	router.StaticFS("/static", http.Dir("www"))
+	router.StaticFS("/vp2/static", http.Dir("www"))
 	router.StaticFS("/Bacovi-rodokmen", http.Dir("www/Bacovi-rodokmen"))
 	router.LoadHTMLFiles("www/vp2.html")
-	router.GET("/", func(c *gin.Context) {
+	router.GET("/vp2", func(c *gin.Context) {
 		c.HTML(http.StatusOK, "vp2.html", nil)
 	})
-	router.GET("/archive", func(c *gin.Context) {
+	router.GET("/vp2/archive", func(c *gin.Context) {
 		if c.Query("from")+c.Query("to") == "" {
 			c.JSON(http.StatusOK, vp.archive)
 		} else {
@@ -243,17 +243,17 @@ AVG_WDIR	text
 			c.JSON(http.StatusOK, archive)
 		}
 	})
-	router.GET("/archive/day", func(c *gin.Context) {
+	router.GET("/vp2/archive/day", func(c *gin.Context) {
 		c.JSON(http.StatusOK, vp.archiveDay)
 	})
-	router.GET("/archive/lastid", vp.getArchiveLastID)
-	router.GET("/current", func(c *gin.Context) {
+	router.GET("/vp2/archive/lastid", vp.getArchiveLastID)
+	router.GET("/vp2/current", func(c *gin.Context) {
 		c.JSON(http.StatusOK, vp.current)
 	})
-	router.GET("/camview.jpg", func(c *gin.Context) {
+	router.GET("/vp2/camview.jpg", func(c *gin.Context) {
 		c.Data(http.StatusOK, c.ContentType(), vp.camdata)
 	})
-	router.GET("/vp2_json", func(c *gin.Context) {
+	router.GET("/vp2/vp2_json", func(c *gin.Context) {
 		d := vp.current
 		t := d.CurrDate
 		c.String(http.StatusOK, "|%s|%s|%.1f|%.0f|%.1f|%.1f|%.0f|%.1f|",
@@ -279,5 +279,5 @@ AVG_WDIR	text
 			vp.camdata = camdata
 		}
 	})
-	router.Run(":80")
+	router.Run(":8082")
 }
